@@ -62,7 +62,7 @@ const ProgressBar = ({ value }) => {
 };
 
 // Componente: Linha da Tabela de KR
-const KrTableRow = ({ kr }) => {
+const KrTableRow = ({ kr, onSelectKr }) => {
     const statusMap = {
         'Aprovado': { icon: <CheckCircle2 size={20} className="text-green-500" />, text: 'text-green-600' },
         'Pendente': { icon: <Clock size={20} className="text-yellow-500" />, text: 'text-yellow-600' },
@@ -84,13 +84,13 @@ const KrTableRow = ({ kr }) => {
                 <span className={`inline-flex items-center space-x-1.5 py-1 px-3 rounded-full text-xs font-medium ${statusInfo.text} bg-gray-100`}>{statusInfo.icon}<span>{kr.status}</span></span>
             </td>
             <td className="py-4 px-6 text-gray-600">{kr.deadline}</td>
-            <td className="py-4 px-6"><button className="text-blue-600 hover:underline font-semibold">Detalhes</button></td>
+            <td className="py-4 px-6"><button onClick={() => onSelectKr(kr)} className="text-blue-600 hover:underline font-semibold">Detalhes</button></td>
         </tr>
     );
 };
 
 // Componente: Tabela de KRs
-const KrTable = ({ krs, onCreateKr }) => (
+const KrTable = ({ krs, onCreateKr, onSelectKr }) => (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
             <h3 className="text-xl font-bold">Key Results da Equipe</h3>
@@ -107,7 +107,7 @@ const KrTable = ({ krs, onCreateKr }) => (
                         <th scope="col" className="py-3 px-6">Key Result</th><th scope="col" className="py-3 px-6">Responsável</th><th scope="col" className="py-3 px-6">Progresso</th><th scope="col" className="py-3 px-6">Status</th><th scope="col" className="py-3 px-6">Prazo Final</th><th scope="col" className="py-3 px-6">Ações</th>
                     </tr>
                 </thead>
-                <tbody>{krs.map(kr => <KrTableRow key={kr.id} kr={kr} />)}</tbody>
+                <tbody>{krs.map(kr => <KrTableRow key={kr.id} kr={kr} onSelectKr={onSelectKr} />)}</tbody>
             </table>
         </div>
         <div className="p-4 border-t border-gray-200 flex justify-between items-center text-sm">
@@ -117,7 +117,7 @@ const KrTable = ({ krs, onCreateKr }) => (
     </div>
 );
 
-// NOVO Componente: Modal de Criação de KR
+// Componente: Modal de Criação de KR
 const CreateKrModal = ({ isOpen, onClose, onSave }) => {
     if (!isOpen) return null;
 
@@ -153,7 +153,7 @@ const CreateKrModal = ({ isOpen, onClose, onSave }) => {
                             <input type="text" name="owner" id="owner" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: João da Silva" />
                         </div>
                         <div>
-                            <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">Prazo Final</p>
+                            <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">Prazo Final</label>
                             <input type="date" name="deadline" id="deadline" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                     </div>
@@ -170,20 +170,30 @@ const CreateKrModal = ({ isOpen, onClose, onSave }) => {
 // --- COMPONENTE PRINCIPAL DA APLICAÇÃO ---
 export default function App() {
     const [krs, setKrs] = useState(initialKrs);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCreateModalOpen, setCreateIsModalOpen] = useState(false);
+    const [selectedKr, setSelectedKr] = useState(null); // Para o modal de detalhes
 
     const handleCreateKr = () => {
-        setIsModalOpen(true);
+        setCreateIsModalOpen(true);
     };
 
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
+    const handleCloseCreateModal = () => {
+        setCreateIsModalOpen(false);
     };
+
 
     const handleSaveKr = (newKr) => {
         setKrs(prevKrs => [...prevKrs, newKr]);
-        setIsModalOpen(false);
+        setCreateIsModalOpen(false);
     };
+
+    const handleSelectKr = (kr) => {
+        setSelectedKr(kr);
+    };
+
+    const handleCloseDetailModal = () => {
+        setSelectedKr(null);
+    }
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
@@ -197,9 +207,9 @@ export default function App() {
                     <StatCard title="Metas Pendentes" value="1" icon={<Clock size={24} className="text-yellow-600"/>} color="bg-yellow-100" />
                     <StatCard title="Membros da Equipe" value="5" icon={<Users size={24} className="text-indigo-600"/>} color="bg-indigo-100" />
                 </div>
-                <KrTable krs={krs} onCreateKr={handleCreateKr} />
+                <KrTable krs={krs} onCreateKr={handleCreateKr} onSelectKr={handleSelectKr} />
             </main>
-            <CreateKrModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSaveKr} />
+            <CreateKrModal isOpen={isCreateModalOpen} onClose={handleCloseCreateModal} onSave={handleSaveKr} />
         </div>
     );
 }
