@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase/config';
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { collection, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { Home, UserPlus, Users as TeamIcon, X, Edit } from 'lucide-react';
+import { Home, UserPlus, Users as TeamIcon, X, Edit, Loader2 } from 'lucide-react';
 
 const EditUserModal = ({ isOpen, onClose, onSave, user, teams }) => {
     if (!isOpen) return null;
@@ -37,6 +38,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState([]);
     const [teams, setTeams] = useState([]);
     const [editingUser, setEditingUser] = useState(null);
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
 
     useEffect(() => {
         const unsubUsers = onSnapshot(collection(db, 'users'), snapshot => {
@@ -50,21 +52,28 @@ export default function AdminPage() {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        setIsCreatingUser(true);
         const formData = new FormData(e.target);
-        const newUser = {
-            email: formData.get('email'),
-            password: formData.get('password'),
-            name: formData.get('name'),
-            role: formData.get('role'),
-            teamId: formData.get('teamId'),
-        };
         
-        // **SIMULAÇÃO DE CLOUD FUNCTION**
-        // Em um projeto real, aqui chamaríamos uma Cloud Function
-        // que criaria o usuário no Firebase Auth e o perfil no Firestore.
-        console.log("CHAMADA SIMULADA PARA CLOUD FUNCTION: ", { action: "createUser", data: newUser });
-        alert("Simulação concluída! Em um ambiente real, o usuário seria criado no Firebase Auth. Verifique o console para ver os dados enviados.");
-        e.target.reset();
+        const functions = getFunctions();
+        const createUserCallable = httpsCallable(functions, 'createUser');
+
+        try {
+            const result = await createUserCallable({
+                email: formData.get('email'),
+                password: formData.get('password'),
+                name: formData.get('name'),
+                role: formData.get('role'),
+                teamId: formData.get('teamId'),
+            });
+            alert(result.data.result);
+            e.target.reset();
+        } catch (error) {
+            console.error("Erro ao chamar a Cloud Function:", error);
+            alert(`Erro: ${error.message}. Verifique se a Cloud Function 'createUser' foi implementada e está ativa.`);
+        } finally {
+            setIsCreatingUser(false);
+        }
     };
     
     const handleCreateTeam = async (e) => {
@@ -104,13 +113,14 @@ export default function AdminPage() {
                             <h2 className="text-xl font-bold mb-4">Gerenciar Usuários</h2>
                             <form onSubmit={handleCreateUser} className="space-y-4 p-4 border rounded-lg">
                                 <h3 className="font-semibold flex items-center space-x-2"><UserPlus size={20}/><span>Criar Novo Usuário</span></h3>
-                                <p className="text-xs text-gray-500">Isto irá simular a criação de um usuário. A implementação final requer uma Cloud Function.</p>
                                 <input name="name" required placeholder="Nome Completo" className="w-full border p-2 rounded-md"/>
                                 <input name="email" type="email" required placeholder="Email" className="w-full border p-2 rounded-md"/>
                                 <input name="password" type="password" required placeholder="Senha (mín. 6 caracteres)" className="w-full border p-2 rounded-md"/>
                                 <select name="role" required className="w-full border p-2 rounded-md"><option value="">Selecione um cargo</option><option value="colaborador">Colaborador</option><option value="admin">Admin</option></select>
                                 <select name="teamId" required className="w-full border p-2 rounded-md"><option value="">Selecione um time</option>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-                                <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">Criar Usuário (Simulação)</button>
+                                <button type="submit" disabled={isCreatingUser} className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex justify-center items-center disabled:bg-blue-300">
+                                    {isCreatingUser ? <Loader2 className="animate-spin" /> : 'Criar Usuário'}
+                                </button>
                             </form>
                             <ul className="mt-4 space-y-2 max-h-60 overflow-y-auto">
                                 {users.map(user => (
