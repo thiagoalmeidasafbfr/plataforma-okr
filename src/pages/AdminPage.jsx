@@ -1,3 +1,7 @@
+// ===================================================================
+// ARQUIVO: src/pages/AdminPage.jsx
+// ATUALIZADO: Implementada uma lógica de chamada à Cloud Function mais robusta e segura.
+// ===================================================================
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db, functions, auth } from '../firebase/config'; // Importa `auth`
