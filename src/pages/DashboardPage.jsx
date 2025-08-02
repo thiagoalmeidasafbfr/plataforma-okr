@@ -21,9 +21,9 @@ const Header = ({ user }) => (
                 )}
                 <span className="text-right">
                     <p className="font-semibold">{user?.name || 'Carregando...'}</p>
-                    <p className="text-sm text-gray-500 capitalize">{user?.role || ''}</p>
+                    <p className="text-sm text-gray-500 capitalize">{user?.jobTitle || user?.role || ''}</p>
                 </span>
-                <img src={user?.avatar || `https://placehold.co/100x100/E2E8F0/4A5568?text=${user?.name?.charAt(0) || '?'}`} alt="Avatar do usuário" className="w-12 h-12 rounded-full border-2 border-blue-500" />
+                <img src={user?.avatar || `https://placehold.co/100x100/E2E8F0/4A5568?text=${user?.name?.charAt(0) || '?'}`} alt="Avatar do utilizador" className="w-12 h-12 rounded-full border-2 border-blue-500" />
                 <button onClick={() => signOut(auth)} className="p-2 rounded-full hover:bg-gray-200" title="Sair"><LogOut size={20} className="text-gray-600"/></button>
             </div>
         </div>
@@ -67,7 +67,7 @@ const KrTableRow = ({ kr, onSelectKr }) => {
 const KrTable = ({ krs, onCreateKr, onSelectKr }) => (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-            <h3 className="text-xl font-bold">Key Results da Equipe</h3>
+            <h3 className="text-xl font-bold">Key Results da Equipa</h3>
             <div className="flex items-center space-x-2">
                 <button onClick={onCreateKr} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm"><PlusCircle size={16} /><span>Criar KR</span></button>
             </div>
@@ -75,11 +75,11 @@ const KrTable = ({ krs, onCreateKr, onSelectKr }) => (
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                    <tr><th scope="col" className="py-3 px-6">Key Result</th><th scope="col" className="py-3 px-6">Responsável</th><th scope="col" className="py-3 px-6">Progresso</th><th scope="col" className="py-3 px-6">Status</th><th scope="col" className="py-3 px-6">Prazo Final</th><th scope="col" className="py-3 px-6">Ações</th></tr>
+                    <tr><th scope="col" className="py-3 px-6">Key Result</th><th scope="col" className="py-3 px-6">Responsável</th><th scope="col" className="py-3 px-6">Progresso</th><th scope="col" className="py-3 px-6">Estado</th><th scope="col" className="py-3 px-6">Prazo Final</th><th scope="col" className="py-3 px-6">Ações</th></tr>
                 </thead>
                 <tbody>
                     {krs.length > 0 ? krs.map(kr => <KrTableRow key={kr.id} kr={kr} onSelectKr={onSelectKr} />) : (
-                        <tr><td colSpan="6" className="text-center py-10 text-gray-500">Nenhum KR encontrado para esta equipe.</td></tr>
+                        <tr><td colSpan="6" className="text-center py-10 text-gray-500">Nenhum KR encontrado para esta equipa.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -105,7 +105,7 @@ const CreateKrModal = ({ isOpen, onClose, onSave, userProfile }) => {
     };
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-30 flex justify-center items-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg"><form onSubmit={handleSubmit}><div className="p-6 border-b border-gray-200 flex justify-between items-center"><h3 className="text-xl font-bold">Criar Novo Key Result</h3><button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={24} /></button></div><div className="p-6 space-y-4"><div><label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome do KR</label><input type="text" name="name" id="name" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">Prazo Final</label><input type="date" name="deadline" id="deadline" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div></div><div className="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition">Cancelar</button><button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">Salvar KR</button></div></form></div>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg"><form onSubmit={handleSubmit}><div className="p-6 border-b border-gray-200 flex justify-between items-center"><h3 className="text-xl font-bold">Criar Novo Key Result</h3><button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={24} /></button></div><div className="p-6 space-y-4"><div><label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome do KR</label><input type="text" name="name" id="name" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">Prazo Final</label><input type="date" name="deadline" id="deadline" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div></div><div className="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition">Cancelar</button><button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">Guardar KR</button></div></form></div>
         </div>
     );
 };
@@ -149,7 +149,7 @@ const KrDetailModal = ({ isOpen, onClose, onSave, kr }) => {
                         </div>
                     </div>
                     <div className="p-6 bg-gray-50 rounded-b-2xl flex justify-end">
-                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Salvar Progresso</button>
+                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Guardar Progresso</button>
                     </div>
                 </form>
             </div>
@@ -186,15 +186,15 @@ export default function DashboardPage({ userProfile }) {
 
     const handleSaveKr = async (newKrData) => {
         if (!userProfile || !userProfile.teamId) {
-            alert("Erro: Perfil do usuário ou time não encontrado. Peça a um admin para associar seu perfil a um time.");
+            alert("Erro: Perfil do utilizador ou equipa não encontrado. Peça a um admin para associar o seu perfil a uma equipa.");
             return;
         }
         try {
             await addDoc(collection(db, 'krs'), newKrData);
             setCreateIsModalOpen(false);
         } catch (error) {
-            console.error("Erro ao salvar KR:", error);
-            alert("Ocorreu um erro ao salvar a meta.");
+            console.error("Erro ao guardar KR:", error);
+            alert("Ocorreu um erro ao guardar a meta.");
         }
     };
 
@@ -214,11 +214,11 @@ export default function DashboardPage({ userProfile }) {
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <Header user={userProfile} />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <h2 className="text-3xl font-bold mb-2">Dashboard do Time: {team?.name || '...'}</h2>
+                <h2 className="text-3xl font-bold mb-2">Dashboard da Equipa: {team?.name || '...'}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-8">
                     <StatCard title="Progresso Médio" value={`${krs.length > 0 ? Math.round(krs.reduce((acc, kr) => acc + kr.progress, 0) / krs.length) : 0}%`} icon={<Target size={24} className="text-blue-600"/>} color="bg-blue-100" />
                     <StatCard title="Metas na Pista" value={krs.length} icon={<CheckCircle2 size={24} className="text-green-600"/>} color="bg-green-100" />
-                    <StatCard title="Membros da Equipe" value={team?.memberCount || "-"} icon={<Users size={24} className="text-indigo-600"/>} color="bg-indigo-100" />
+                    <StatCard title="Membros da Equipa" value={team?.memberCount || "-"} icon={<Users size={24} className="text-indigo-600"/>} color="bg-indigo-100" />
                 </div>
                 {userProfile?.teamId ? (
                     <KrTable krs={krs} onCreateKr={() => setCreateIsModalOpen(true)} onSelectKr={setSelectedKr} />
@@ -228,7 +228,7 @@ export default function DashboardPage({ userProfile }) {
                             <div className="py-1"><AlertTriangle className="h-5 w-5 text-yellow-500 mr-3" /></div>
                             <div>
                                 <p className="font-bold">Perfil Incompleto</p>
-                                <p className="text-sm">Você ainda não está associado a um time. Por favor, peça a um administrador para configurar seu perfil no painel de administração.</p>
+                                <p className="text-sm">Ainda não está associado a uma equipa. Por favor, peça a um administrador para configurar o seu perfil no painel de administração.</p>
                             </div>
                         </div>
                     </div>
