@@ -6,52 +6,73 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 /**
- * Cloud Function para criar um novo usuário no Firebase Authentication
+ * Cloud Function para criar um novo utilizador no Firebase Authentication
  * e um perfil correspondente no Firestore.
- * Pode ser chamada de forma segura pelo nosso aplicativo React.
  */
 exports.createUser = functions.https.onCall(async (data, context) => {
   
-  // Extrai os dados enviados pelo nosso app (email, senha, nome, etc.)
-  const email = data.email;
-  const password = data.password;
-  const name = data.name;
-  const role = data.role;
-  const teamId = data.teamId;
+  // Passo 1: Verificar se o pedido vem de um utilizador autenticado e se esse utilizador é um admin.
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated', 
+      'O pedido deve ser feito por um utilizador autenticado.'
+    );
+  }
 
-  // Validação básica dos dados recebidos
-  if (!email || !password || !name || !role) {
+  const callerUid = context.auth.uid;
+  const userProfileDoc = await admin.firestore().collection('users').doc(callerUid).get();
+  
+  if (!userProfileDoc.exists() || userProfileDoc.data().role !== 'admin') {
+    throw new functions.https.HttpsError(
+      'permission-denied', 
+      'Apenas administradores podem criar novos utilizadores.'
+    );
+  }
+
+  // Passo 2: Extrair e registar cada variável para depuração.
+  console.log("Dados brutos recebidos:", data);
+  const { email, password, name, role, jobTitle, teamId } = data;
+  
+  console.log(`Email: ${email}`);
+  console.log(`Password: ${password ? 'Presente' : 'Ausente'}`);
+  console.log(`Name: ${name}`);
+  console.log(`Role: ${role}`);
+  console.log(`JobTitle: ${jobTitle}`);
+  console.log(`TeamId: ${teamId}`);
+
+  // Passo 3: Validação dos dados recebidos.
+  if (!email || !password || !name || !role || !jobTitle) {
+    console.error("Falha na validação. Pelo menos um campo obrigatório está em falta.");
     throw new functions.https.HttpsError(
       'invalid-argument', 
-      'Dados incompletos. Nome, email, senha e cargo são obrigatórios.'
+      'Dados incompletos. Nome, email, senha, perfil e cargo são obrigatórios.'
     );
   }
 
   try {
-    // 1. Usa o Admin SDK para criar o usuário no Firebase Authentication
+    // Passo 4: Criar o utilizador no Firebase Authentication.
     const userRecord = await admin.auth().createUser({
       email: email,
       password: password,
       displayName: name,
     });
 
-    // 2. Com o usuário criado, pega o UID dele
     const uid = userRecord.uid;
 
-    // 3. Cria o documento de perfil correspondente na coleção "users" do Firestore
+    // Passo 5: Criar o documento de perfil no Firestore.
     await admin.firestore().collection("users").doc(uid).set({
       name: name,
       email: email,
       role: role,
-      teamId: teamId || "", // Garante que o campo exista, mesmo que vazio
+      jobTitle: jobTitle,
+      teamId: teamId || "",
     });
 
-    // Retorna uma mensagem de sucesso para o nosso app
-    return { result: `Usuário ${email} criado com sucesso.` };
+    // Retorna uma mensagem de sucesso.
+    return { result: `Utilizador ${email} criado com sucesso.` };
 
   } catch (error) {
-    // Se der algum erro (ex: email já existe), retorna o erro para o app
-    console.error("Erro ao criar usuário:", error);
+    console.error("Erro ao criar utilizador:", error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });

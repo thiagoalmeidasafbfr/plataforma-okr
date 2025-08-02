@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { db } from '../firebase/config';
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { db, functions, auth } from '../firebase/config'; // Importa `auth`
+import { httpsCallable } from "firebase/functions";
 import { collection, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { Home, UserPlus, Users as TeamIcon, X, Edit, Loader2 } from 'lucide-react';
 
@@ -63,6 +63,7 @@ export default function AdminPage() {
     const [teams, setTeams] = useState([]);
     const [editingUser, setEditingUser] = useState(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [creationError, setCreationError] = useState("");
 
     useEffect(() => {
         const unsubUsers = onSnapshot(collection(db, 'users'), snapshot => {
@@ -77,12 +78,20 @@ export default function AdminPage() {
     const handleCreateUser = async (e) => {
         e.preventDefault();
         setIsCreatingUser(true);
-        const formData = new FormData(e.target);
-        
-        const functions = getFunctions();
-        const createUserCallable = httpsCallable(functions, 'createUser');
+        setCreationError("");
 
         try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                throw new Error("Utilizador não autenticado. Por favor, faça login novamente.");
+            }
+
+            // Força a atualização do token de autenticação para garantir que está válido.
+            await currentUser.getIdToken(true);
+
+            const createUserCallable = httpsCallable(functions, 'createUser');
+            const formData = new FormData(e.target);
+
             const result = await createUserCallable({
                 email: formData.get('email'),
                 password: formData.get('password'),
@@ -91,11 +100,12 @@ export default function AdminPage() {
                 jobTitle: formData.get('jobTitle'),
                 teamId: formData.get('teamId'),
             });
+
             alert(result.data.result);
             e.target.reset();
         } catch (error) {
-            console.error("Erro ao chamar a Cloud Function:", error);
-            alert(`Erro: ${error.message}. Verifique se a Cloud Function 'createUser' foi implementada e está ativa.`);
+            console.error("Erro detalhado ao criar utilizador:", error);
+            setCreationError(`Erro: ${error.message}. Verifique os registos da função e o console do navegador.`);
         } finally {
             setIsCreatingUser(false);
         }
@@ -152,12 +162,12 @@ export default function AdminPage() {
                                 </div>
                                 <div>
                                     <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">Perfil</label>
-                                    <select id="role" name="role" required className="w-full border p-2 rounded-md"><option value="">Selecione um perfil</option><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Admin</option></select>
+                                    <select id="role" name="role" required defaultValue="" className="w-full border p-2 rounded-md"><option value="" disabled>Selecione um perfil</option><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Admin</option></select>
                                 </div>
                                 <div>
                                     <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-                                    <select id="jobTitle" name="jobTitle" required className="w-full border p-2 rounded-md">
-                                        <option value="">Selecione um cargo</option>
+                                    <select id="jobTitle" name="jobTitle" required defaultValue="" className="w-full border p-2 rounded-md">
+                                        <option value="" disabled>Selecione um cargo</option>
                                         <option value="Analista Jr">Analista Jr</option>
                                         <option value="Analista Pleno">Analista Pleno</option>
                                         <option value="Analista Sr">Analista Sr</option>
@@ -168,8 +178,9 @@ export default function AdminPage() {
                                 </div>
                                 <div>
                                     <label htmlFor="teamId" className="block text-sm font-medium text-gray-700 mb-1">Equipa</label>
-                                    <select id="teamId" name="teamId" required className="w-full border p-2 rounded-md"><option value="">Selecione uma equipa</option>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+                                    <select id="teamId" name="teamId" required defaultValue="" className="w-full border p-2 rounded-md"><option value="" disabled>Selecione uma equipa</option>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
                                 </div>
+                                {creationError && <p className="text-red-500 text-sm">{creationError}</p>}
                                 <button type="submit" disabled={isCreatingUser} className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex justify-center items-center disabled:bg-blue-300">
                                     {isCreatingUser ? <Loader2 className="animate-spin" /> : 'Criar Utilizador'}
                                 </button>
