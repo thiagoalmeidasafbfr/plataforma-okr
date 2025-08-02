@@ -113,11 +113,26 @@ export default function AdminPage() {
                             <h2 className="text-xl font-bold mb-4">Gerenciar Usuários</h2>
                             <form onSubmit={handleCreateUser} className="space-y-4 p-4 border rounded-lg">
                                 <h3 className="font-semibold flex items-center space-x-2"><UserPlus size={20}/><span>Criar Novo Usuário</span></h3>
-                                <input name="name" required placeholder="Nome Completo" className="w-full border p-2 rounded-md"/>
-                                <input name="email" type="email" required placeholder="Email" className="w-full border p-2 rounded-md"/>
-                                <input name="password" type="password" required placeholder="Senha (mín. 6 caracteres)" className="w-full border p-2 rounded-md"/>
-                                <select name="role" required className="w-full border p-2 rounded-md"><option value="">Selecione um cargo</option><option value="colaborador">Colaborador</option><option value="admin">Admin</option></select>
-                                <select name="teamId" required className="w-full border p-2 rounded-md"><option value="">Selecione um time</option>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+                                <div>
+                                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                                    <input id="name" name="name" required className="w-full border p-2 rounded-md"/>
+                                </div>
+                                <div>
+                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input id="email" name="email" type="email" required className="w-full border p-2 rounded-md"/>
+                                </div>
+                                <div>
+                                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                                    <input id="password" name="password" type="password" required placeholder="Mín. 6 caracteres" className="w-full border p-2 rounded-md"/>
+                                </div>
+                                <div>
+                                    <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
+                                    <select id="role" name="role" required className="w-full border p-2 rounded-md"><option value="">Selecione um cargo</option><option value="colaborador">Colaborador</option><option value="admin">Admin</option></select>
+                                </div>
+                                <div>
+                                    <label htmlFor="teamId" className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                                    <select id="teamId" name="teamId" required className="w-full border p-2 rounded-md"><option value="">Selecione um time</option>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+                                </div>
                                 <button type="submit" disabled={isCreatingUser} className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex justify-center items-center disabled:bg-blue-300">
                                     {isCreatingUser ? <Loader2 className="animate-spin" /> : 'Criar Usuário'}
                                 </button>
@@ -135,8 +150,14 @@ export default function AdminPage() {
                              <h2 className="text-xl font-bold mb-4">Gerenciar Equipes</h2>
                              <form onSubmit={handleCreateTeam} className="space-y-4 p-4 border rounded-lg">
                                 <h3 className="font-semibold flex items-center space-x-2"><TeamIcon size={20}/><span>Criar Nova Equipe</span></h3>
-                                <input name="teamName" required placeholder="Nome da Equipe" className="w-full border p-2 rounded-md"/>
-                                <select name="leaderId" required className="w-full border p-2 rounded-md"><option value="">Selecione um líder</option>{users.filter(u => u.role === 'admin').map(admin => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
+                                <div>
+                                    <label htmlFor="teamName" className="block text-sm font-medium text-gray-700 mb-1">Nome da Equipe</label>
+                                    <input id="teamName" name="teamName" required className="w-full border p-2 rounded-md"/>
+                                </div>
+                                <div>
+                                    <label htmlFor="leaderId" className="block text-sm font-medium text-gray-700 mb-1">Líder da Equipe</label>
+                                    <select id="leaderId" name="leaderId" required className="w-full border p-2 rounded-md"><option value="">Selecione um líder</option>{users.filter(u => u.role === 'admin').map(admin => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
+                                </div>
                                 <button type="submit" className="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700">Criar Equipe</button>
                             </form>
                              <ul className="mt-4 space-y-2 max-h-60 overflow-y-auto">
