@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync-metas": "node scripts/syncMetas.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
