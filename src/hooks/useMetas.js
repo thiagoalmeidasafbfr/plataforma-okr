@@ -1,24 +1,9 @@
 import { useState, useEffect } from 'react';
-/**
- * Faz o download e converte um arquivo CSV simples em um array de objetos.
- * Os campos devem ser separados por vírgula e não possuir vírgulas internas.
- *
- * @param {string} path Caminho do arquivo dentro da pasta `public`.
- * @returns {Promise<Array<Object>>} Dados convertidos para objeto.
- */
-async function fetchCSV(path) {
-    const response = await fetch(path);
-    const text = await response.text();
-    const [headerLine, ...lines] = text.trim().split('\n');
-    const headers = headerLine.split(',');
-    return lines.map(line => {
-        const values = line.split(',');
-        return Object.fromEntries(headers.map((h, i) => [h.trim(), values[i] ? values[i].trim() : '']));
-    });
-}
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 /**
- * Hook para consultar metas e respectivos resultados mensais.
+ * Hook para consultar metas e respectivos resultados mensais armazenados no Firestore.
  *
  * @param {string} area - Área para filtrar as metas (opcional).
  * @param {string} mesReferencia - Mês no formato 'YYYY-MM' para obter o resultado (opcional).
@@ -31,25 +16,27 @@ export function useMetas(area, mesReferencia) {
     useEffect(() => {
         async function carregarMetas() {
             try {
-                // Carrega as planilhas localizadas em `public/data`.
-                const metasData = await fetchCSV('/data/metas.csv');
-                const resultadosData = await fetchCSV('/data/resultados.csv');
+                const snapshot = await getDocs(collection(db, 'metas'));
+                let metasData = snapshot.docs.map(doc => ({ idMeta: doc.id, ...doc.data() }));
+                if (area) {
+                    metasData = metasData.filter(m => m.area === area);
+                }
 
-                // Filtra as metas conforme a área selecionada.
-                const metasFiltradas = area ? metasData.filter(m => m.area === area) : metasData;
-
-                const metasComResultados = metasFiltradas.map(meta => {
-                    const resultadoLinha = resultadosData.find(r => r.idMeta === meta.idMeta && (!mesReferencia || r.mes === mesReferencia));
-                    const resultado = resultadoLinha ? Number(resultadoLinha.resultado) : null;
-
-                    // Cálculo do percentual de conclusão com base no peso da meta.
+                const metasComResultados = await Promise.all(metasData.map(async meta => {
+                    let resultado = null;
+                    if (mesReferencia) {
+                        const resultadoDoc = await getDoc(doc(db, 'metas', meta.idMeta, 'resultados', mesReferencia));
+                        if (resultadoDoc.exists()) {
+                            resultado = Number(resultadoDoc.data().resultado);
+                        }
+                    }
                     const peso = Number(meta.peso || 0);
                     const percentual = resultado !== null && peso > 0
                         ? Math.min((resultado / peso) * 100, 100)
                         : 0;
-
                     return { ...meta, resultado, percentual };
-                });
+                }));
+
                 setMetas(metasComResultados);
             } catch (error) {
                 console.error('Erro ao carregar metas:', error);
@@ -62,3 +49,4 @@ export function useMetas(area, mesReferencia) {
 
     return { metas, loading };
 }
+
