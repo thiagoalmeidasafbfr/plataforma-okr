@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock, Users, Target, PlusCircle, X, LogOut, Shield, AlertTriangle, Edit } from 'lucide-react';
+import { CheckCircle2, Clock, Users, Target, PlusCircle, X, LogOut, Shield, AlertTriangle, Edit, TrendingUp } from 'lucide-react';
 import { db, auth } from '../firebase/config';
-import { collection, onSnapshot, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, query, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Header = ({ user }) => (
     <header className="bg-white shadow-sm sticky top-0 z-20">
@@ -20,8 +21,9 @@ const Header = ({ user }) => (
                     </Link>
                 )}
                 <span className="text-right">
-                    <p className="font-semibold">{user?.name || 'Carregando...'}</p>
+                    <p className="font-semibold">{user?.name || 'A carregar...'}</p>
                     <p className="text-sm text-gray-500 capitalize">{user?.jobTitle || user?.role || ''}</p>
+                    {user?.area && <p className="text-xs text-blue-600 font-medium">Área: {user.area}</p>}
                 </span>
                 <img src={user?.avatar || `https://placehold.co/100x100/E2E8F0/4A5568?text=${user?.name?.charAt(0) || '?'}`} alt="Avatar do utilizador" className="w-12 h-12 rounded-full border-2 border-blue-500" />
                 <button onClick={() => signOut(auth)} className="p-2 rounded-full hover:bg-gray-200" title="Sair"><LogOut size={20} className="text-gray-600"/></button>
@@ -37,49 +39,72 @@ const StatCard = ({ title, value, icon, color }) => (
     </div>
 );
 
-const ProgressBar = ({ value }) => {
-    const cappedValue = Math.min(Math.max(value, 0), 100);
+const ProgressBar = ({ progress, weight }) => {
+    const displayProgress = Math.min(progress, 100);
     let colorClass = 'bg-blue-500';
-    if (cappedValue < 40) colorClass = 'bg-red-500';
-    else if (cappedValue < 70) colorClass = 'bg-yellow-500';
-    else colorClass = 'bg-green-500';
-    return <div className="w-full bg-gray-200 rounded-full h-2.5"><div className={`${colorClass} h-2.5 rounded-full`} style={{ width: `${cappedValue}%` }}></div></div>;
+    if (progress >= 100) colorClass = 'bg-gradient-to-r from-yellow-400 to-yellow-600';
+    else if (progress < 40) colorClass = 'bg-red-500';
+    else if (progress < 70) colorClass = 'bg-yellow-500';
+    
+    return (
+        <div className="w-full space-y-1">
+            <div className="w-full bg-gray-200 rounded-full h-3 relative overflow-hidden">
+                <div className={`${colorClass} h-3 rounded-full transition-all duration-500`} style={{ width: `${displayProgress}%` }}></div>
+                {progress > 100 && (
+                    <div className="absolute top-0 left-0 h-full w-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-yellow-800">BÓNUS!</span>
+                    </div>
+                )}
+            </div>
+            <div className="flex justify-between text-xs text-gray-500">
+                <span>Peso: {weight}%</span>
+                <span>{progress}%</span>
+            </div>
+        </div>
+    );
 };
 
 const KrTableRow = ({ kr, onSelectKr }) => {
-    const statusMap = {
-        'Aprovado': { icon: <CheckCircle2 size={20} className="text-green-500" />, text: 'text-green-600' },
-        'Pendente': { icon: <Clock size={20} className="text-yellow-500" />, text: 'text-yellow-600' },
-    };
-    const statusInfo = statusMap[kr.status] || statusMap['Pendente'];
+    const currentValue = kr.checkpoints?.reduce((sum, cp) => sum + (cp.value || 0), 0) || 0;
+    const progress = kr.targetValue > 0 ? Math.round((currentValue / kr.targetValue) * 100) : 0;
+
     return (
         <tr className="border-b border-gray-200 hover:bg-gray-50">
-            <td className="py-4 px-6 font-medium text-gray-800">{kr.name}</td>
-            <td className="py-4 px-6 text-gray-600">{kr.ownerName}</td>
-            <td className="py-4 px-6"><div className="flex items-center space-x-2"><ProgressBar value={kr.progress} /><span className="font-semibold text-sm text-gray-700">{kr.progress}%</span></div></td>
-            <td className="py-4 px-6"><span className={`inline-flex items-center space-x-1.5 py-1 px-3 rounded-full text-xs font-medium ${statusInfo.text} bg-gray-100`}>{statusInfo.icon}<span>{kr.status}</span></span></td>
-            <td className="py-4 px-6 text-gray-600">{kr.deadline}</td>
+            <td className="py-4 px-6 font-medium text-gray-800 w-1/3">{kr.name}</td>
+            <td className="py-4 px-6 text-gray-600">{kr.area || 'N/A'}</td>
+            <td className="py-4 px-6 text-center text-gray-600 font-medium">{kr.weight || 0}%</td>
+            <td className="py-4 px-6">
+                <ProgressBar progress={progress} weight={kr.weight || 0} />
+            </td>
             <td className="py-4 px-6"><button onClick={() => onSelectKr(kr)} className="text-blue-600 hover:underline font-semibold flex items-center space-x-1"><Edit size={14}/><span>Detalhes</span></button></td>
         </tr>
     );
 };
 
-const KrTable = ({ krs, onCreateKr, onSelectKr }) => (
+const KrTable = ({ krs, userProfile }) => (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-            <h3 className="text-xl font-bold">Key Results da Equipa</h3>
-            <div className="flex items-center space-x-2">
-                <button onClick={onCreateKr} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm"><PlusCircle size={16} /><span>Criar KR</span></button>
+            <div>
+                <h3 className="text-xl font-bold">Metas da {userProfile?.area || 'Área'}</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                    {userProfile?.role === 'admin' ? 'Visualizando todas as metas' : `Metas específicas da área ${userProfile?.area}`}
+                </p>
             </div>
         </div>
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                    <tr><th scope="col" className="py-3 px-6">Key Result</th><th scope="col" className="py-3 px-6">Responsável</th><th scope="col" className="py-3 px-6">Progresso</th><th scope="col" className="py-3 px-6">Estado</th><th scope="col" className="py-3 px-6">Prazo Final</th><th scope="col" className="py-3 px-6">Ações</th></tr>
+                    <tr>
+                        <th scope="col" className="py-3 px-6 w-1/3">Meta</th>
+                        <th scope="col" className="py-3 px-6">Área</th>
+                        <th scope="col" className="py-3 px-6 text-center">Peso</th>
+                        <th scope="col" className="py-3 px-6">Progresso</th>
+                        <th scope="col" className="py-3 px-6">Ações</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    {krs.length > 0 ? krs.map(kr => <KrTableRow key={kr.id} kr={kr} onSelectKr={onSelectKr} />) : (
-                        <tr><td colSpan="6" className="text-center py-10 text-gray-500">Nenhum KR encontrado para esta equipa.</td></tr>
+                    {krs.length > 0 ? krs.map(kr => <KrTableRow key={kr.id} kr={kr} onSelectKr={() => {}} />) : (
+                        <tr><td colSpan="5" className="text-center py-10 text-gray-500">Nenhuma meta encontrada para sua área.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -87,155 +112,243 @@ const KrTable = ({ krs, onCreateKr, onSelectKr }) => (
     </div>
 );
 
-const CreateKrModal = ({ isOpen, onClose, onSave, userProfile }) => {
-    if (!isOpen) return null;
-    const handleSubmit = (event) => {
-        event.preventDefault();
-        const formData = new FormData(event.target);
-        const newKr = {
-            name: formData.get('name'),
-            ownerId: userProfile.uid,
-            ownerName: userProfile.name,
-            teamId: userProfile.teamId,
-            progress: 0,
-            status: 'Pendente',
-            deadline: new Date(formData.get('deadline')).toLocaleDateString('pt-BR', {timeZone: 'UTC'}),
-        };
-        onSave(newKr);
-    };
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 flex justify-center items-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg"><form onSubmit={handleSubmit}><div className="p-6 border-b border-gray-200 flex justify-between items-center"><h3 className="text-xl font-bold">Criar Novo Key Result</h3><button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={24} /></button></div><div className="p-6 space-y-4"><div><label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome do KR</label><input type="text" name="name" id="name" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">Prazo Final</label><input type="date" name="deadline" id="deadline" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div></div><div className="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-3"><button type="button" onClick={onClose} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition">Cancelar</button><button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">Guardar KR</button></div></form></div>
-        </div>
-    );
-};
-
-const KrDetailModal = ({ isOpen, onClose, onSave, kr }) => {
+const KrDetailModal = ({ isOpen, onClose, kr }) => {
     if (!isOpen) return null;
 
-    const [progress, setProgress] = useState(kr.progress || 0);
+    const currentValue = kr.checkpoints?.reduce((sum, cp) => sum + (cp.value || 0), 0) || 0;
+    const progress = kr.targetValue > 0 ? Math.round((currentValue / kr.targetValue) * 100) : 0;
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSave(kr.id, { progress: Number(progress) });
+    // Agregar dados por mês para o gráfico
+    const monthlyData = kr.checkpoints?.reduce((acc, cp) => {
+        const date = new Date(cp.date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        
+        if (!acc[monthKey]) {
+            acc[monthKey] = { month: monthName, valor: 0, acumulado: 0 };
+        }
+        acc[monthKey].valor += cp.value || 0;
+        return acc;
+    }, {}) || {};
+
+    // Calcular valores acumulados
+    let accumulated = 0;
+    const chartData = Object.values(monthlyData).map(item => {
+        accumulated += item.valor;
+        return { ...item, acumulado: accumulated };
+    });
+
+    const formatValue = (value) => {
+        if (kr.unit === 'R$' || kr.unit === '€') {
+            return new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: kr.unit === 'R$' ? 'BRL' : 'EUR' 
+            }).format(value);
+        }
+        return `${new Intl.NumberFormat('pt-BR').format(value)} ${kr.unit}`;
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                        <h3 className="text-xl font-bold">Detalhes do KR</h3>
-                        <button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={24} /></button>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b flex justify-between items-center">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800">{kr.name}</h3>
+                        <p className="text-sm text-gray-600">Área: {kr.area} | Peso: {kr.weight}% | Meta: {formatValue(kr.targetValue)}</p>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 transition">
+                        <X size={24} />
+                    </button>
+                </div>
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-6">
                         <div>
-                            <h4 className="font-semibold">{kr.name}</h4>
-                            <p className="text-sm text-gray-500">Responsável: {kr.ownerName}</p>
+                            <h4 className="font-bold text-gray-800 mb-3">Progresso Atual</h4>
+                            <ProgressBar progress={progress} weight={kr.weight} />
+                            <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                                <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500">Atual</p>
+                                    <p className="font-bold text-lg">{formatValue(currentValue)}</p>
+                                </div>
+                                <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-gray-500">Faltam</p>
+                                    <p className="font-bold text-lg">{formatValue(Math.max(0, kr.targetValue - currentValue))}</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label htmlFor="progress" className="block text-sm font-medium text-gray-700 mb-1">Progresso Atual (%)</label>
-                            <input 
-                                id="progress" 
-                                name="progress" 
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={progress}
-                                onChange={(e) => setProgress(e.target.value)}
-                                required 
-                                className="w-full border p-2 rounded-md"
-                            />
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                            <h5 className="font-semibold text-blue-800 mb-2">Informações da Meta</h5>
+                            <div className="space-y-1 text-sm">
+                                <p><span className="font-medium">Diretoria:</span> {kr.diretoria}</p>
+                                <p><span className="font-medium">Responsável:</span> {kr.responsavel_apuracao}</p>
+                                <p><span className="font-medium">Frequência:</span> {kr.frequencia_apuracao}</p>
+                                <p><span className="font-medium">Fonte:</span> {kr.fonte_dados}</p>
+                            </div>
                         </div>
                     </div>
-                    <div className="p-6 bg-gray-50 rounded-b-2xl flex justify-end">
-                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Guardar Progresso</button>
+                    <div>
+                        <h4 className="font-bold text-gray-800 mb-4">Evolução Mensal</h4>
+                        <div className="h-64 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="month" />
+                                    <YAxis tickFormatter={(value) => kr.unit === 'R$' ? `R$${(value/1000000).toFixed(0)}M` : `${value}`} />
+                                    <Tooltip formatter={(value) => [formatValue(value), 'Valor']} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="valor" stroke="#3b82f6" strokeWidth={2} name="Mensal" />
+                                    <Line type="monotone" dataKey="acumulado" stroke="#10b981" strokeWidth={2} name="Acumulado" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            <h5 className="font-semibold text-gray-700">Histórico de Resultados</h5>
+                            {kr.checkpoints?.length > 0 ? (
+                                [...kr.checkpoints].reverse().map((cp, index) => (
+                                    <div key={index} className="text-sm border-b border-gray-200 pb-2">
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-semibold text-blue-600">{formatValue(cp.value)}</p>
+                                            <span className="text-gray-500 text-xs">{new Date(cp.date).toLocaleDateString('pt-BR')}</span>
+                                        </div>
+                                        <p className="text-gray-600 italic">"{cp.comment}"</p>
+                                        <p className="text-gray-500 text-xs">por {cp.author}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-gray-500 text-sm">Nenhum resultado registrado ainda.</p>
+                            )}
+                        </div>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );
 };
 
-
 export default function DashboardPage({ userProfile }) {
     const [krs, setKrs] = useState([]);
-    const [team, setTeam] = useState(null);
-    const [isCreateModalOpen, setCreateIsModalOpen] = useState(false);
     const [selectedKr, setSelectedKr] = useState(null);
 
     useEffect(() => {
-        if (!userProfile?.teamId) return;
-        
-        const krsCollectionRef = collection(db, 'krs');
-        const q = query(krsCollectionRef, where("teamId", "==", userProfile.teamId));
+        if (!userProfile) return;
+
+        let q;
+        if (userProfile.role === 'admin') {
+            // Admin pode ver todas as metas
+            q = collection(db, 'krs');
+        } else if (userProfile.area) {
+            // Usuários normais veem apenas metas da sua área
+            q = query(collection(db, 'krs'), where("area", "==", userProfile.area));
+        } else {
+            // Se não tem área definida, não mostra nada
+            setKrs([]);
+            return;
+        }
+
         const unsubscribeKrs = onSnapshot(q, (snapshot) => {
             const krsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setKrs(krsData);
         });
-        
-        const teamDocRef = doc(db, 'teams', userProfile.teamId);
-        const unsubscribeTeam = onSnapshot(teamDocRef, (doc) => {
-            if (doc.exists()) {
-                setTeam({ id: doc.id, ...doc.data() });
-            }
-        });
 
-        return () => { unsubscribeKrs(); unsubscribeTeam(); };
+        return () => unsubscribeKrs();
     }, [userProfile]);
 
-    const handleSaveKr = async (newKrData) => {
-        if (!userProfile || !userProfile.teamId) {
-            alert("Erro: Perfil do utilizador ou equipa não encontrado. Peça a um admin para associar o seu perfil a uma equipa.");
-            return;
-        }
-        try {
-            await addDoc(collection(db, 'krs'), newKrData);
-            setCreateIsModalOpen(false);
-        } catch (error) {
-            console.error("Erro ao guardar KR:", error);
-            alert("Ocorreu um erro ao guardar a meta.");
-        }
+    const calculateWeightedAverage = () => {
+        if (krs.length === 0) return 0;
+        const totalWeight = krs.reduce((sum, kr) => sum + (kr.weight || 0), 0);
+        if (totalWeight === 0) return 0;
+        
+        const weightedProgress = krs.reduce((sum, kr) => {
+            const currentValue = kr.checkpoints?.reduce((s, cp) => s + (cp.value || 0), 0) || 0;
+            const progress = kr.targetValue > 0 ? (currentValue / kr.targetValue) * 100 : 0;
+            return sum + (progress * ((kr.weight || 0) / totalWeight));
+        }, 0);
+
+        return Math.round(weightedProgress);
     };
 
-    const handleUpdateKr = async (krId, updatedData) => {
-        const krDocRef = doc(db, 'krs', krId);
-        try {
-            await updateDoc(krDocRef, updatedData);
-            alert("Progresso atualizado com sucesso!");
-            setSelectedKr(null);
-        } catch (error) {
-            console.error("Erro ao atualizar KR:", error);
-            alert("Ocorreu um erro ao atualizar o progresso.");
-        }
+    const getKrsOnTrack = () => {
+        return krs.filter(kr => {
+            const currentValue = kr.checkpoints?.reduce((sum, cp) => sum + (cp.value || 0), 0) || 0;
+            const progress = kr.targetValue > 0 ? (currentValue / kr.targetValue) * 100 : 0;
+            return progress >= 60; // Consideramos "na pista" se >= 60%
+        }).length;
+    };
+
+    const getKrsWithBonus = () => {
+        return krs.filter(kr => {
+            const currentValue = kr.checkpoints?.reduce((sum, cp) => sum + (cp.value || 0), 0) || 0;
+            const progress = kr.targetValue > 0 ? (currentValue / kr.targetValue) * 100 : 0;
+            return progress > 100;
+        }).length;
     };
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <Header user={userProfile} />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <h2 className="text-3xl font-bold mb-2">Dashboard da Equipa: {team?.name || '...'}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-8">
-                    <StatCard title="Progresso Médio" value={`${krs.length > 0 ? Math.round(krs.reduce((acc, kr) => acc + kr.progress, 0) / krs.length) : 0}%`} icon={<Target size={24} className="text-blue-600"/>} color="bg-blue-100" />
-                    <StatCard title="Metas na Pista" value={krs.length} icon={<CheckCircle2 size={24} className="text-green-600"/>} color="bg-green-100" />
-                    <StatCard title="Membros da Equipa" value={team?.memberCount || "-"} icon={<Users size={24} className="text-indigo-600"/>} color="bg-indigo-100" />
+                <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                        Dashboard - {userProfile?.area || 'Área não definida'}
+                    </h2>
+                    <p className="text-gray-600">
+                        {userProfile?.role === 'admin' 
+                            ? 'Visualização completa de todas as metas do clube' 
+                            : `Acompanhe o desempenho das metas da área ${userProfile?.area}`
+                        }
+                    </p>
                 </div>
-                {userProfile?.teamId ? (
-                    <KrTable krs={krs} onCreateKr={() => setCreateIsModalOpen(true)} onSelectKr={setSelectedKr} />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <StatCard 
+                        title="Progresso Ponderado" 
+                        value={`${calculateWeightedAverage()}%`} 
+                        icon={<Target size={24} className="text-blue-600"/>} 
+                        color="bg-blue-100" 
+                    />
+                    <StatCard 
+                        title="Metas na Pista" 
+                        value={`${getKrsOnTrack()}/${krs.length}`} 
+                        icon={<CheckCircle2 size={24} className="text-green-600"/>} 
+                        color="bg-green-100" 
+                    />
+                    <StatCard 
+                        title="Metas com Bônus" 
+                        value={getKrsWithBonus()} 
+                        icon={<TrendingUp size={24} className="text-yellow-600"/>} 
+                        color="bg-yellow-100" 
+                    />
+                    <StatCard 
+                        title="Total de Metas" 
+                        value={krs.length} 
+                        icon={<Users size={24} className="text-indigo-600"/>} 
+                        color="bg-indigo-100" 
+                    />
+                </div>
+                
+                {userProfile?.area || userProfile?.role === 'admin' ? (
+                    <KrTable krs={krs} userProfile={userProfile} onSelectKr={setSelectedKr} />
                 ) : (
-                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-r-lg">
                         <div className="flex">
-                            <div className="py-1"><AlertTriangle className="h-5 w-5 text-yellow-500 mr-3" /></div>
+                            <div className="py-1">
+                                <AlertTriangle className="h-6 w-6 text-yellow-500 mr-3" />
+                            </div>
                             <div>
-                                <p className="font-bold">Perfil Incompleto</p>
-                                <p className="text-sm">Ainda não está associado a uma equipa. Por favor, peça a um administrador para configurar o seu perfil no painel de administração.</p>
+                                <p className="font-bold text-yellow-800">Área não definida</p>
+                                <p className="text-sm text-yellow-700">
+                                    Você ainda não tem uma área associada ao seu perfil. Por favor, entre em contato com um administrador para configurar sua área de acesso.
+                                </p>
                             </div>
                         </div>
                     </div>
                 )}
             </main>
-            <CreateKrModal isOpen={isCreateModalOpen} onClose={() => setCreateIsModalOpen(false)} onSave={handleSaveKr} userProfile={userProfile} />
-            <KrDetailModal isOpen={!!selectedKr} onClose={() => setSelectedKr(null)} onSave={handleUpdateKr} kr={selectedKr} />
+            <KrDetailModal 
+                isOpen={!!selectedKr} 
+                onClose={() => setSelectedKr(null)} 
+                kr={selectedKr} 
+            />
         </div>
     );
 }
